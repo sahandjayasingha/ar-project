@@ -29,72 +29,99 @@
     <div id="status-banner">Searching for Hiro Marker...</div>
 
     <script>
-        AFRAME.registerComponent('ball-color-changer', {
+        AFRAME.registerComponent('ar-click-system', {
             init: function () {
-                var el = this.el;
+                var sceneEl = this.el;
                 var colors = ['#EF2D5E', '#4CC3D9', '#FFC65D', '#7BC8A4', '#9B59B6', '#FF9800'];
-                
-                function triggerColorChange(evt) {
-                    if (evt) evt.stopPropagation();
-                    var randomColor = colors[Math.floor(Math.random() * colors.length)];
-                    el.setAttribute('material', 'color', randomColor);
-                }
-
-                el.addEventListener('click', triggerColorChange);
-                el.addEventListener('mousedown', triggerColorChange);
-                el.addEventListener('touchstart', triggerColorChange);
-            }
-        });
-
-        AFRAME.registerComponent('grow-toggle', {
-            init: function () {
-                var el = this.el;
                 var isExpanded = false;
 
-                function triggerScaleToggle(evt) {
-                    if (evt) evt.stopPropagation();
-                    isExpanded = !isExpanded;
-                    if (isExpanded) {
-                        el.setAttribute('scale', '0.28 0.28 0.28');
-                    } else {
-                        el.setAttribute('scale', '0.18 0.18 0.18');
+                function handlePointer(clientX, clientY) {
+                    var camera = sceneEl.camera;
+                    if (!camera) return;
+
+                    var mouse = new THREE.Vector2();
+                    mouse.x = (clientX / window.innerWidth) * 2 - 1;
+                    mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+
+                    var raycaster = new THREE.Raycaster();
+                    raycaster.setFromCamera(mouse, camera);
+
+                    var clickableEls = sceneEl.querySelectorAll('.clickable');
+                    var meshes = [];
+                    clickableEls.forEach(function (el) {
+                        if (el.object3D) {
+                            meshes.push(el.object3D);
+                        }
+                    });
+
+                    var intersects = raycaster.intersectObjects(meshes, true);
+
+                    if (intersects.length > 0) {
+                        var hitMesh = intersects[0].object;
+                        var hitEl = hitMesh.el;
+
+                        while (!hitEl && hitMesh.parent) {
+                            hitMesh = hitMesh.parent;
+                            hitEl = hitMesh.el;
+                        }
+
+                        if (hitEl) {
+                            if (hitEl.id === 'interactive-ball') {
+                                var nextColor = colors[Math.floor(Math.random() * colors.length)];
+                                hitEl.setAttribute('material', 'color', nextColor);
+                            } else if (hitEl.id === 'interactive-box') {
+                                isExpanded = !isExpanded;
+                                if (isExpanded) {
+                                    hitEl.setAttribute('scale', '0.28 0.28 0.28');
+                                } else {
+                                    hitEl.setAttribute('scale', '0.18 0.18 0.18');
+                                }
+                            }
+                        }
                     }
                 }
 
-                el.addEventListener('click', triggerScaleToggle);
-                el.addEventListener('mousedown', triggerScaleToggle);
-                el.addEventListener('touchstart', triggerScaleToggle);
+                window.addEventListener('click', function (e) {
+                    handlePointer(e.clientX, e.clientY);
+                });
+
+                window.addEventListener('touchstart', function (e) {
+                    if (e.touches.length > 0) {
+                        handlePointer(e.touches[0].clientX, e.touches[0].clientY);
+                    }
+                });
             }
         });
     </script>
 
     <a-scene embedded
              vr-mode-ui="enabled: false"
-             arjs="sourceType: webcam; debugUIEnabled: false;">
+             arjs="sourceType: webcam; debugUIEnabled: false;"
+             ar-click-system>
 
         <a-assets>
             <a-asset-item id="houseModel" src="assets/house.glb"></a-asset-item>
         </a-assets>
 
-        <a-marker preset="hiro" id="hiro-marker" emitevents="true" cursor="rayOrigin: mouse" raycaster="objects: .clickable">
+        <a-marker preset="hiro" id="hiro-marker">
             <a-entity gltf-model="#houseModel"
                       position="0 0.1 0"
                       scale="0.25 0.25 0.25"
                       animation="property: rotation; to: 0 360 0; loop: true; dur: 9000; easing: linear">
             </a-entity>
 
-            <a-box position="-0.45 0.2 0"
+            <a-box id="interactive-box"
+                   position="-0.45 0.2 0"
                    scale="0.18 0.18 0.18"
                    material="color: #4CC3D9;"
-                   class="clickable"
-                   grow-toggle>
+                   class="clickable">
             </a-box>
 
-            <a-sphere position="0.45 0.2 0"
+            <a-sphere id="interactive-ball"
+                      position="0.45 0.2 0"
                       radius="0.1"
                       material="color: #EF2D5E;"
                       class="clickable"
-                      ball-color-changer
                       animation="property: position; to: 0.45 0.45 0; dir: alternate; loop: true; dur: 1200; easing: easeInOutSine">
             </a-sphere>
 
@@ -106,7 +133,7 @@
             </a-text>
         </a-marker>
 
-        <a-entity camera cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
+        <a-entity camera></a-entity>
     </a-scene>
 
     <script>
